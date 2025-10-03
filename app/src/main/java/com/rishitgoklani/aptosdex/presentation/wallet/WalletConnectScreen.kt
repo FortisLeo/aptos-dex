@@ -3,6 +3,11 @@ package com.rishitgoklani.aptosdex.presentation.wallet
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.background
 import com.rishitgoklani.aptosdex.ui.components.CosmicBackground
+import com.rishitgoklani.morero.components.SphericalParticleOrb
+import com.rishitgoklani.aptosdex.ui.components.OrbitalAnimation
+import com.rishitgoklani.aptosdex.ui.components.OrbitingToken
+import com.rishitgoklani.aptosdex.ui.components.UsdcLogo
+import com.rishitgoklani.aptosdex.ui.components.BonkLogo
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -30,31 +35,39 @@ fun WalletConnectScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             if (!isConnected) {
-                // 80% - Orbital Animation Section
+                // 80% - Compact particle orb (80.dp) with orbiting tokens
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(0.8f),
                     contentAlignment = Alignment.Center
                 ) {
-                    com.rishitgoklani.aptosdex.ui.components.OrbitalAnimation(
+                    OrbitalAnimation(
                         centerContent = {
-                            com.rishitgoklani.aptosdex.ui.components.AptosLogo(size = 80.dp)
+                            SphericalParticleOrb(
+                                modifier = Modifier.size(80.dp),
+                                particleCount = 600,
+                                sphereRadius = 40.dp,
+                                dotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
+                                rotationDurationMs = (10000f / 0.6f).toInt(),
+                                focalLength = 420f,
+                                onClick = onConnectClick
+                            )
                         },
                         orbitingTokens = listOf(
-                            com.rishitgoklani.aptosdex.ui.components.OrbitingToken(
-                                icon = { com.rishitgoklani.aptosdex.ui.components.UsdcLogo(size = 52.dp) },
+                            OrbitingToken(
+                                icon = { UsdcLogo(size = 42.dp) },
                                 orbitRadius = 240f,
                                 speed = 1.2f,
                                 startAngle = 0f,
-                                iconSize = 52f
+                                iconSize = 42f
                             ),
-                            com.rishitgoklani.aptosdex.ui.components.OrbitingToken(
-                                icon = { com.rishitgoklani.aptosdex.ui.components.BonkLogo(size = 52.dp) },
+                            OrbitingToken(
+                                icon = { BonkLogo(size = 42.dp) },
                                 orbitRadius = 420f,
                                 speed = 0.8f,
                                 startAngle = 180f,
-                                iconSize = 52f
+                                iconSize = 42f
                             )
                         ),
                         modifier = Modifier
