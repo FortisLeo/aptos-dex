@@ -1,7 +1,15 @@
 package com.rishitgoklani.aptosdex.presentation.tokendetail
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rishitgoklani.aptosdex.domain.model.Order
+import com.rishitgoklani.aptosdex.domain.model.OrderSide
+import com.rishitgoklani.aptosdex.domain.model.OrderType as DomainOrderType
+import com.rishitgoklani.aptosdex.domain.repository.OrderBookRepository
+import com.rishitgoklani.aptosdex.domain.repository.WalletRepository
+import com.rishitgoklani.aptosdex.domain.usecase.PlaceOrderResult
+import com.rishitgoklani.aptosdex.domain.usecase.PlaceOrderUseCase
 import com.rishitgoklani.aptosdex.presentation.tokendetail.components.OrderType
 import com.rishitgoklani.aptosdex.presentation.tokendetail.components.TradeType
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -12,6 +20,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.Locale
 import javax.inject.Inject
+import com.rishitgoklani.aptosdex.blockchain.petra.PetraWalletConnector
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 
 /**
  * UI state for trading bottom sheet
@@ -108,11 +119,21 @@ data class TradingBottomSheetUiState(
  */
 @HiltViewModel
 class TradingBottomSheetViewModel @Inject constructor(
-    // TODO: Inject trading use cases when implementing smart contracts
+    private val placeOrderUseCase: PlaceOrderUseCase,
+    private val petraWalletConnector: PetraWalletConnector,
+    private val orderBookRepository: OrderBookRepository,
+    private val walletRepository: WalletRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TradingBottomSheetUiState())
     val uiState: StateFlow<TradingBottomSheetUiState> = _uiState.asStateFlow()
+
+    sealed class NavigationEvent {
+        data class OpenPetraWallet(val intent: android.content.Intent) : NavigationEvent()
+    }
+
+    private val _navigationEvents = MutableSharedFlow<NavigationEvent>()
+    val navigationEvents: SharedFlow<NavigationEvent> = _navigationEvents
 
     companion object {
         private const val TAG = "TradingBottomSheetVM"
@@ -191,7 +212,7 @@ class TradingBottomSheetViewModel @Inject constructor(
 
     /**
      * Execute the trade order
-     * TODO: Implement smart contract integration
+     * Places order in frontend orderbook (since smart contract is not working)
      */
     fun executeOrder(onSuccess: () -> Unit) {
         val state = _uiState.value
@@ -204,26 +225,54 @@ class TradingBottomSheetViewModel @Inject constructor(
             _uiState.update { it.copy(isExecuting = true, errorMessage = null) }
 
             try {
-                // TODO: Implement order execution logic
-                // 1. Validate wallet balance
-                // 2. Build transaction
-                // 3. Sign transaction
-                // 4. Submit to blockchain
-                // 5. Wait for confirmation
+                val price = state.effectivePrice.toDoubleOrNull() ?: 0.0
+                val amount = state.effectiveAmount.toDoubleOrNull() ?: 0.0
+                val isBuy = state.selectedTradeType == TradeType.BUY
 
-                // Simulating order execution
-                kotlinx.coroutines.delay(1000)
+                Log.d(TAG, "Executing ${if (isBuy) "BUY" else "SELL"} order:")
+                Log.d(TAG, "Token: ${state.tokenSymbol}, Price: $price, Amount: $amount")
 
-                // On success
-                _uiState.update {
-                    it.copy(
-                        isExecuting = false,
-                        errorMessage = null
-                    )
+                // Get wallet address
+                val walletAddress = walletRepository.getConnectedWalletAddress()
+                if (walletAddress == null) {
+                    _uiState.update {
+                        it.copy(
+                            isExecuting = false,
+                            errorMessage = "Connect your wallet to place an order"
+                        )
+                    }
+                    return@launch
                 }
-                onSuccess()
+
+                // Create order
+                val order = Order(
+                    symbol = state.tokenSymbol,
+                    side = if (isBuy) OrderSide.BUY else OrderSide.SELL,
+                    type = if (state.selectedOrderType == OrderType.LIMIT) DomainOrderType.LIMIT else DomainOrderType.MARKET,
+                    price = price,
+                    amount = amount,
+                    walletAddress = walletAddress
+                )
+
+                // Place order in frontend orderbook
+                val result = orderBookRepository.placeOrder(order)
+                if (result.isSuccess) {
+                    Log.d(TAG, "Order placed successfully: ${order.id}")
+                    _uiState.update { it.copy(isExecuting = false) }
+                    onSuccess()
+                } else {
+                    val errorMessage = result.exceptionOrNull()?.message ?: "Failed to place order"
+                    Log.e(TAG, "Order placement failed: $errorMessage")
+                    _uiState.update {
+                        it.copy(
+                            isExecuting = false,
+                            errorMessage = errorMessage
+                        )
+                    }
+                }
 
             } catch (e: Exception) {
+                Log.e(TAG, "Error executing order", e)
                 _uiState.update {
                     it.copy(
                         isExecuting = false,

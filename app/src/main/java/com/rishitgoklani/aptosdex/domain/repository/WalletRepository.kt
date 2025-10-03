@@ -12,4 +12,5 @@ interface WalletRepository {
     )
     suspend fun restoreConnectionState(): WalletConnection?
     suspend fun clearConnectionState()
+    suspend fun getConnectedWalletAddress(): String?
 }

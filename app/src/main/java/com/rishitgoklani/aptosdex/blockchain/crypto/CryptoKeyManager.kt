@@ -4,9 +4,11 @@ import android.util.Log
 import com.goterl.lazysodium.LazySodiumAndroid
 import com.goterl.lazysodium.SodiumAndroid
 import com.goterl.lazysodium.interfaces.Box
+import com.goterl.lazysodium.interfaces.Random
 import com.rishitgoklani.aptosdex.domain.model.ConnectionKeys
 import com.rishitgoklani.aptosdex.domain.repository.CryptoRepository
 import javax.inject.Inject
+ 
 
 class CryptoKeyManager @Inject constructor() : CryptoRepository {
 
@@ -14,20 +16,25 @@ class CryptoKeyManager @Inject constructor() : CryptoRepository {
         private const val TAG = "CryptoKeyManager"
     }
 
-    private val lazySodium = LazySodiumAndroid(SodiumAndroid())
+    private val lazySodium by lazy {
+        try {
+            LazySodiumAndroid(SodiumAndroid())
+        } catch (e: UnsatisfiedLinkError) {
+            Log.e(TAG, "LazySodium native library not available", e)
+            null
+        }
+    }
+    
 
     override fun generateKeyPair(): ConnectionKeys {
-        val publicKey = ByteArray(Box.PUBLICKEYBYTES)
-        val secretKey = ByteArray(Box.SECRETKEYBYTES)
-
-        lazySodium.cryptoBoxKeypair(publicKey, secretKey)
-
-        Log.d(TAG, "Generated key pair - Public key: ${bytesToHex(publicKey)}")
-
-        return ConnectionKeys(
-            secretKey = secretKey,
-            publicKey = publicKey
-        )
+        val sodium = lazySodium ?: throw IllegalStateException("libsodium not available")
+        return run {
+            val publicKey = ByteArray(Box.PUBLICKEYBYTES)
+            val secretKey = ByteArray(Box.SECRETKEYBYTES)
+            sodium.cryptoBoxKeypair(publicKey, secretKey)
+            Log.d(TAG, "Generated key pair with LazySodium - Public key: ${bytesToHex(publicKey)}")
+            ConnectionKeys(secretKey = secretKey, publicKey = publicKey)
+        }
     }
 
     override fun computeSharedKey(
@@ -35,25 +42,26 @@ class CryptoKeyManager @Inject constructor() : CryptoRepository {
         secretKey: ByteArray
     ): Result<ByteArray> {
         return try {
-            // Remove 0x prefix if present
-            val cleanKey = if (petraPublicKey.startsWith("0x")) {
-                petraPublicKey.substring(2)
-            } else {
-                petraPublicKey
-            }
+            val sodium = lazySodium ?: throw IllegalStateException("libsodium not available")
+                // Remove 0x prefix if present
+                val cleanKey = if (petraPublicKey.startsWith("0x")) {
+                    petraPublicKey.substring(2)
+                } else {
+                    petraPublicKey
+                }
 
-            val petraPubKeyBytes = hexToBytes(cleanKey)
-            val sharedKey = ByteArray(Box.BEFORENMBYTES)
+                val petraPubKeyBytes = hexToBytes(cleanKey)
+                val sharedKey = ByteArray(Box.BEFORENMBYTES)
 
-            val success = lazySodium.cryptoBoxBeforeNm(sharedKey, petraPubKeyBytes, secretKey)
+                val success = sodium.cryptoBoxBeforeNm(sharedKey, petraPubKeyBytes, secretKey)
 
-            if (success) {
-                Log.d(TAG, "Shared key computed successfully")
-                Result.success(sharedKey)
-            } else {
-                Log.e(TAG, "Failed to compute shared key")
-                Result.failure(Exception("Failed to compute shared key"))
-            }
+                if (success) {
+                    Log.d(TAG, "Shared key computed successfully with LazySodium")
+                    Result.success(sharedKey)
+                } else {
+                    Log.e(TAG, "Failed to compute shared key with LazySodium")
+                    Result.failure(Exception("Failed to compute shared key"))
+                }
         } catch (e: Exception) {
             Log.e(TAG, "Error computing shared key", e)
             Result.failure(e)
@@ -73,5 +81,41 @@ class CryptoKeyManager @Inject constructor() : CryptoRepository {
             i += 2
         }
         return data
+    }
+
+    override fun encryptPayload(
+        payload: String,
+        nonce: ByteArray,
+        sharedKey: ByteArray
+    ): Result<ByteArray> {
+        return try {
+            val sodium = lazySodium ?: throw IllegalStateException("libsodium not available")
+                val payloadBytes = payload.toByteArray()
+                val encryptedBytes = ByteArray(payloadBytes.size + Box.MACBYTES)
+                
+                val success = sodium.cryptoBoxEasyAfterNm(
+                    encryptedBytes,
+                    payloadBytes,
+                    payloadBytes.size.toLong(),
+                    nonce,
+                    sharedKey
+                )
+                
+                if (success) {
+                    Log.d(TAG, "Payload encrypted successfully with LazySodium")
+                    Result.success(encryptedBytes)
+                } else {
+                    Log.e(TAG, "Failed to encrypt payload with LazySodium")
+                    Result.failure(Exception("Failed to encrypt payload"))
+                }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error encrypting payload", e)
+            Result.failure(e)
+        }
+    }
+
+    override fun generateNonce(): ByteArray {
+        val sodium = lazySodium ?: throw IllegalStateException("libsodium not available")
+        return sodium.randomBytesBuf(Box.NONCEBYTES)
     }
 }

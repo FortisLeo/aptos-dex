@@ -54,4 +54,13 @@ class WalletRepositoryImpl @Inject constructor(
         Log.d(TAG, "Clearing connection state")
         connectionStateStorage.clearConnectionState()
     }
+
+    override suspend fun getConnectedWalletAddress(): String? {
+        val connection = restoreConnectionState()
+        return if (connection?.isConnected == true) {
+            connection.address
+        } else {
+            null
+        }
+    }
 }

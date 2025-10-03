@@ -107,27 +107,8 @@ fun HomeScreen(
                                 tokenDetailArgs = null
                             },
                             onBuyClick = {
-                                // Find the token from whitelist
-                                val token =
-                                    com.rishitgoklani.aptosdex.presentation.tokens.TokenWhitelist.allowed
-                                        .firstOrNull {
-                                            it.symbol.equals(
-                                                tokenDetailArgs!!.symbol,
-                                                ignoreCase = true
-                                            )
-                                        }
-
-                                // Set as receive token if found
-                                token?.let {
-                                    swapVm.onTokenChosen(it, selectingForReceive = true)
-                                }
-
-                                // Navigate to swap tab
-                                selectedTab = HomeTab.SWAP
-
-                                // Close token detail
-                                showTokenDetail = false
-                                tokenDetailArgs = null
+                                // Trading bottom sheet will be shown by TokenDetailScreen
+                                // No need to navigate to swap or close token detail
                             }
                         )
                     }

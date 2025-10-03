@@ -39,6 +39,12 @@ android {
     buildFeatures {
         compose = true
     }
+    
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
 }
 
 kapt {
@@ -58,8 +64,10 @@ dependencies {
     implementation(libs.material)
     implementation(libs.androidx.material.icons.extended)
 
-    // Petra Wallet Integration
-    implementation("com.goterl:lazysodium-android:5.2.0@aar")
+    // Petra Wallet Integration (use JNA Android AAR to include native libs)
+    implementation(libs.lazysodium.android) {
+        exclude(group = "net.java.dev.jna", module = "jna")
+    }
     implementation("net.java.dev.jna:jna:5.18.1@aar")
     implementation(libs.gson)
 
@@ -96,7 +104,9 @@ dependencies {
     implementation("dev.chrisbanes.haze:haze:1.6.10")
 
     // Aptos Kotlin SDK
-    implementation("xyz.mcxross.kaptos:kaptos-android:0.1.2-beta")
+    implementation("xyz.mcxross.kaptos:kaptos-android:0.1.2-beta") {
+        exclude(group = "net.java.dev.jna", module = "jna")
+    }
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

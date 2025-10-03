@@ -24,4 +24,16 @@ class CryptoRepositoryImpl @Inject constructor(
     override fun hexToBytes(hex: String): ByteArray {
         return cryptoKeyManager.hexToBytes(hex)
     }
+
+    override fun encryptPayload(
+        payload: String,
+        nonce: ByteArray,
+        sharedKey: ByteArray
+    ): Result<ByteArray> {
+        return cryptoKeyManager.encryptPayload(payload, nonce, sharedKey)
+    }
+
+    override fun generateNonce(): ByteArray {
+        return cryptoKeyManager.generateNonce()
+    }
 }

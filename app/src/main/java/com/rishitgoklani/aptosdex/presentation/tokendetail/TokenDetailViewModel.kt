@@ -7,12 +7,12 @@ import com.rishitgoklani.aptosdex.domain.model.ChartDataResult
 import com.rishitgoklani.aptosdex.domain.model.ChartTimePeriod
 import com.rishitgoklani.aptosdex.domain.model.TokenPriceResult
 import com.rishitgoklani.aptosdex.domain.model.OrderBookLevel
-import com.rishitgoklani.aptosdex.domain.model.OrderBookResult
+import com.rishitgoklani.aptosdex.domain.model.AptosOrderBookResult
 import com.rishitgoklani.aptosdex.domain.usecase.FetchChartDataUseCase
-import com.rishitgoklani.aptosdex.domain.usecase.FetchOrderBookSnapshotUseCase
+import com.rishitgoklani.aptosdex.domain.usecase.FetchAptosOrderBookUseCase
+import com.rishitgoklani.aptosdex.domain.usecase.StreamAptosTradeEventsUseCase
 import com.rishitgoklani.aptosdex.domain.usecase.FetchTokenPricesUseCase
 import com.rishitgoklani.aptosdex.domain.usecase.SubscribeToPriceUpdatesUseCase
-import com.rishitgoklani.aptosdex.domain.usecase.SubscribeToOrderBookUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,9 +33,9 @@ import javax.inject.Inject
 class TokenDetailViewModel @Inject constructor(
     private val fetchChartDataUseCase: FetchChartDataUseCase,
     private val fetchTokenPricesUseCase: FetchTokenPricesUseCase,
-    private val fetchOrderBookSnapshotUseCase: FetchOrderBookSnapshotUseCase,
-    private val subscribeToPriceUpdatesUseCase: SubscribeToPriceUpdatesUseCase,
-    private val subscribeToOrderBookUseCase: SubscribeToOrderBookUseCase
+    private val fetchAptosOrderBookUseCase: FetchAptosOrderBookUseCase,
+    private val streamAptosTradeEventsUseCase: StreamAptosTradeEventsUseCase,
+    private val subscribeToPriceUpdatesUseCase: SubscribeToPriceUpdatesUseCase
 ) : ViewModel() {
 
     companion object {
@@ -59,8 +59,8 @@ class TokenDetailViewModel @Inject constructor(
 
     private var currentSymbol: String = ""
     private var priceWebSocketJob: Job? = null
-    private var orderBookWebSocketJob: Job? = null
-    private var lastOrderBookUpdateId: Long = 0L
+    private var aptosTradeEventsJob: Job? = null
+    private var localOrderBook = mutableMapOf<Double, OrderBookLevel>() // Price -> Level mapping
 
     /**
      * Loads all token data including price, chart, and metadata
@@ -87,23 +87,45 @@ class TokenDetailViewModel @Inject constructor(
     }
 
     /**
-     * Loads initial order book snapshot from REST API
+     * Loads initial order book snapshot from Aptos smart contract
+     * Calls get_book_depth view function
      */
     private fun loadOrderBookSnapshot() {
         if (currentSymbol.isEmpty()) return
 
         viewModelScope.launch {
-            Log.d(TAG, "Loading order book snapshot for $currentSymbol")
-            when (val result = fetchOrderBookSnapshotUseCase(currentSymbol, limit = 20)) {
-                is OrderBookResult.Success -> {
+            Log.d(TAG, "Loading Aptos order book snapshot for $currentSymbol")
+            when (val result = fetchAptosOrderBookUseCase(currentSymbol)) {
+                is AptosOrderBookResult.Success -> {
                     val snapshot = result.snapshot
-                    lastOrderBookUpdateId = snapshot.lastUpdateId
-                    _orderBookBids.value = snapshot.bids
-                    _orderBookAsks.value = snapshot.asks
-                    Log.d(TAG, "Order book snapshot loaded: ${snapshot.bids.size} bids, ${snapshot.asks.size} asks, lastUpdateId=$lastOrderBookUpdateId")
+
+                    // Convert Aptos PriceLevels to OrderBookLevel format for UI
+                    // Aggregate all orders at each price level
+                    val bids = snapshot.buyOrders.map { priceLevel ->
+                        OrderBookLevel(
+                            price = priceLevel.price,
+                            quantity = priceLevel.totalSize
+                        )
+                    }
+                    val asks = snapshot.sellOrders.map { priceLevel ->
+                        OrderBookLevel(
+                            price = priceLevel.price,
+                            quantity = priceLevel.totalSize
+                        )
+                    }
+
+                    _orderBookBids.value = bids
+                    _orderBookAsks.value = asks
+
+                    // Initialize local order book for event updates
+                    localOrderBook.clear()
+                    bids.forEach { localOrderBook[it.price] = it }
+                    asks.forEach { localOrderBook[it.price] = it }
+
+                    Log.d(TAG, "Aptos order book snapshot loaded: ${snapshot.buyOrders.size} buy levels, ${snapshot.sellOrders.size} sell levels")
                 }
-                is OrderBookResult.Failure -> {
-                    Log.e(TAG, "Failed to load order book snapshot: ${result.error}")
+                is AptosOrderBookResult.Failure -> {
+                    Log.e(TAG, "Failed to load Aptos order book snapshot: ${result.error}")
                 }
             }
         }
@@ -120,11 +142,11 @@ class TokenDetailViewModel @Inject constructor(
 
         Log.d(TAG, "Starting WebSocket streams for $currentSymbol")
 
-        // Cancel existing WebSocket connections
+        // Cancel existing connections
         priceWebSocketJob?.cancel()
-        orderBookWebSocketJob?.cancel()
+        aptosTradeEventsJob?.cancel()
 
-        // Subscribe to price updates
+        // Subscribe to price updates (from Binance for now)
         priceWebSocketJob = viewModelScope.launch {
             Log.d(TAG, "Launching price WebSocket job for $currentSymbol")
             subscribeToPriceUpdatesUseCase(currentSymbol)
@@ -152,25 +174,20 @@ class TokenDetailViewModel @Inject constructor(
                 }
         }
 
-        // Subscribe to order book updates
-        orderBookWebSocketJob = viewModelScope.launch {
-            Log.d(TAG, "Launching order book WebSocket job for $currentSymbol")
-            subscribeToOrderBookUseCase(currentSymbol)
+        // Subscribe to Aptos trade events for order book updates
+        aptosTradeEventsJob = viewModelScope.launch {
+            Log.d(TAG, "Starting Aptos trade event stream for $currentSymbol")
+            streamAptosTradeEventsUseCase(currentSymbol)
                 .catch { e ->
-                    Log.e(TAG, "Error in order book WebSocket stream for $currentSymbol", e)
+                    Log.e(TAG, "Error in Aptos trade event stream for $currentSymbol", e)
                 }
-                .collect { orderBookUpdate ->
-                    Log.d(TAG, "OrderBook Update Received: ${orderBookUpdate.symbol}")
-                    Log.d(TAG, "Update IDs: first=${orderBookUpdate.firstUpdateId}, final=${orderBookUpdate.finalUpdateId}, last=$lastOrderBookUpdateId")
-                    Log.d(TAG, "Bids: ${orderBookUpdate.bids.size}, Asks: ${orderBookUpdate.asks.size}")
-                    if (orderBookUpdate.bids.isNotEmpty()) {
-                        Log.d(TAG, "Best Bid: ${orderBookUpdate.bids.first().price}")
-                    }
-                    if (orderBookUpdate.asks.isNotEmpty()) {
-                        Log.d(TAG, "Best Ask: ${orderBookUpdate.asks.first().price}")
-                    }
+                .collect { tradeEvent ->
+                    Log.d(TAG, "Aptos TradeEvent Received: seq=${tradeEvent.eventSequenceNumber}")
+                    Log.d(TAG, "MakerOrderId: ${tradeEvent.makerOrderId}, TakerOrderId: ${tradeEvent.takerOrderId}")
+                    Log.d(TAG, "Price: ${tradeEvent.price}, Size: ${tradeEvent.size}, Timestamp: ${tradeEvent.timestamp}")
 
-                    applyOrderBookUpdate(orderBookUpdate)
+                    // Update local order book based on the trade
+                    applyTradeEventToOrderBook(tradeEvent)
                 }
         }
 
@@ -178,69 +195,44 @@ class TokenDetailViewModel @Inject constructor(
     }
 
     /**
-     * Applies order book update from WebSocket
-     * Follows Binance's update ID validation rules
+     * Apply trade event to local order book
+     * Updates the order book when a trade is executed on-chain
      */
-    private fun applyOrderBookUpdate(update: com.rishitgoklani.aptosdex.domain.model.OrderBookUpdate) {
-        // Validate update based on Binance rules:
-        // 1. First event's firstUpdateId should be <= lastUpdateId+1
-        // 2. Each event's firstUpdateId should equal previous finalUpdateId+1
+    private fun applyTradeEventToOrderBook(tradeEvent: com.rishitgoklani.aptosdex.domain.model.AptosTradeEvent) {
+        // When a trade happens, it consumes liquidity at a specific price level
+        // TradeEvent contains: makerOrderId, takerOrderId, price, size, timestamp
 
-        if (lastOrderBookUpdateId == 0L) {
-            // No snapshot loaded yet, skip this update
-            Log.w(TAG, "Skipping order book update: no snapshot loaded yet")
-            return
-        }
+        val priceLevel = localOrderBook[tradeEvent.price]
 
-        // For first update after snapshot: firstUpdateId <= lastUpdateId+1 AND finalUpdateId >= lastUpdateId+1
-        // For subsequent updates: firstUpdateId should equal previous finalUpdateId+1
-        if (update.firstUpdateId > lastOrderBookUpdateId + 1) {
-            Log.w(TAG, "Order book update gap detected. Expected firstUpdateId <= ${lastOrderBookUpdateId + 1}, got ${update.firstUpdateId}")
-            // Re-fetch snapshot to resync
-            loadOrderBookSnapshot()
-            return
-        }
+        if (priceLevel != null) {
+            // Update the quantity at this price level
+            val newQuantity = (priceLevel.quantity - tradeEvent.size).coerceAtLeast(0.0)
 
-        if (update.finalUpdateId <= lastOrderBookUpdateId) {
-            Log.d(TAG, "Skipping old order book update: finalUpdateId=${update.finalUpdateId}, lastUpdateId=$lastOrderBookUpdateId")
-            return
-        }
-
-        // Apply updates to bids and asks
-        val updatedBids = mergePriceLevels(_orderBookBids.value, update.bids)
-            .sortedByDescending { it.price } // Highest bid first
-        val updatedAsks = mergePriceLevels(_orderBookAsks.value, update.asks)
-            .sortedBy { it.price } // Lowest ask first
-
-        _orderBookBids.value = updatedBids.take(20) // Keep top 20
-        _orderBookAsks.value = updatedAsks.take(20) // Keep top 20
-        lastOrderBookUpdateId = update.finalUpdateId
-
-        Log.d(TAG, "Applied order book update: finalUpdateId=$lastOrderBookUpdateId, bids=${updatedBids.size}, asks=${updatedAsks.size}")
-    }
-
-    /**
-     * Merges price level updates into existing order book
-     * Removes levels with quantity 0, updates existing levels, adds new levels
-     * Note: Sorting is done separately for bids (descending) and asks (ascending)
-     */
-    private fun mergePriceLevels(
-        existing: List<OrderBookLevel>,
-        updates: List<OrderBookLevel>
-    ): List<OrderBookLevel> {
-        val priceMap = existing.associateBy { it.price }.toMutableMap()
-
-        updates.forEach { update ->
-            if (update.quantity == 0.0) {
-                // Remove this price level
-                priceMap.remove(update.price)
+            if (newQuantity > 0) {
+                // Update the level
+                localOrderBook[tradeEvent.price] = OrderBookLevel(
+                    price = tradeEvent.price,
+                    quantity = newQuantity
+                )
             } else {
-                // Update or add this price level
-                priceMap[update.price] = update
+                // Remove the level if fully consumed
+                localOrderBook.remove(tradeEvent.price)
             }
         }
 
-        return priceMap.values.toList()
+        // Rebuild bids and asks from local order book
+        val allLevels = localOrderBook.values.toList()
+        val bids = allLevels.filter { it.price < (tradeEvent.price * 1.01) } // Approximate bid side
+            .sortedByDescending { it.price }
+            .take(20)
+        val asks = allLevels.filter { it.price >= (tradeEvent.price * 1.01) } // Approximate ask side
+            .sortedBy { it.price }
+            .take(20)
+
+        _orderBookBids.value = bids
+        _orderBookAsks.value = asks
+
+        Log.d(TAG, "Applied trade event to order book: ${bids.size} bids, ${asks.size} asks")
     }
 
     /**
@@ -305,11 +297,11 @@ class TokenDetailViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        Log.d(TAG, "ViewModel cleared, closing WebSocket connections for $currentSymbol")
-        // Cancel WebSocket connections when ViewModel is cleared
+        Log.d(TAG, "ViewModel cleared, closing connections for $currentSymbol")
+        // Cancel WebSocket and Aptos event stream connections when ViewModel is cleared
         priceWebSocketJob?.cancel()
-        orderBookWebSocketJob?.cancel()
-        Log.d(TAG, "WebSocket connections closed")
+        aptosTradeEventsJob?.cancel()
+        Log.d(TAG, "All connections closed")
     }
 
     /**

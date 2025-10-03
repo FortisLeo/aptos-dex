@@ -1,5 +1,6 @@
 package com.rishitgoklani.aptosdex.presentation.tokendetail.components
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -10,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -41,10 +43,31 @@ fun TradingBottomSheet(
     viewModel: TradingBottomSheetViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     // Initialize ViewModel with token data
     LaunchedEffect(tokenSymbol, currentPrice) {
         viewModel.initialize(tokenSymbol, currentPrice)
+    }
+
+    // Handle navigation events (opening Petra wallet)
+    LaunchedEffect(Unit) {
+        viewModel.navigationEvents.collect { event ->
+            when (event) {
+                is TradingBottomSheetViewModel.NavigationEvent.OpenPetraWallet -> {
+                    try {
+                        context.startActivity(event.intent)
+                    } catch (e: android.content.ActivityNotFoundException) {
+                        // Handle case where Petra is not installed
+                        android.util.Log.e("TradingBottomSheet", "Petra wallet not installed", e)
+                        // The ViewModel will handle showing the error message
+                    } catch (e: Exception) {
+                        android.util.Log.e("TradingBottomSheet", "Failed to open Petra wallet", e)
+                        // The ViewModel will handle showing the error message
+                    }
+                }
+            }
+        }
     }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)

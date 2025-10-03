@@ -11,4 +11,10 @@ interface CryptoRepository {
     ): Result<ByteArray>
     fun bytesToHex(bytes: ByteArray): String
     fun hexToBytes(hex: String): ByteArray
+    fun encryptPayload(
+        payload: String,
+        nonce: ByteArray,
+        sharedKey: ByteArray
+    ): Result<ByteArray>
+    fun generateNonce(): ByteArray
 }

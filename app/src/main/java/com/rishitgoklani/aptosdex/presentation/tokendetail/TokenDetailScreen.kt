@@ -17,6 +17,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.rishitgoklani.aptosdex.presentation.tokendetail.components.*
+import com.rishitgoklani.aptosdex.presentation.orderbook.OrderBookViewModel
 import com.rishitgoklani.aptosdex.ui.components.CosmicBackground
 
 /**
@@ -37,13 +38,15 @@ fun TokenDetailScreen(
     onBack: () -> Unit,
     onBuyClick: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: TokenDetailViewModel = hiltViewModel()
+    viewModel: TokenDetailViewModel = hiltViewModel(),
+    orderBookViewModel: OrderBookViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val chartData by viewModel.chartData.collectAsStateWithLifecycle()
     val selectedTimePeriod by viewModel.selectedTimePeriod.collectAsStateWithLifecycle()
     val orderBookBids by viewModel.orderBookBids.collectAsStateWithLifecycle()
     val orderBookAsks by viewModel.orderBookAsks.collectAsStateWithLifecycle()
+    val orderBookUiState by orderBookViewModel.uiState.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableStateOf(TabType.CHART) }
     var showTradingBottomSheet by remember { mutableStateOf(false) }
 
@@ -55,6 +58,7 @@ fun TokenDetailScreen(
     // Load chart data when screen opens
     LaunchedEffect(tokenSymbol) {
         viewModel.loadTokenData(tokenSymbol, tokenAddress)
+        orderBookViewModel.initialize(tokenSymbol)
     }
 
     Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -123,7 +127,8 @@ fun TokenDetailScreen(
                         item {
                             Spacer(Modifier.height(16.dp))
                             OrderBookSection(
-                                orderBookData = orderBookData,
+                                buyOrders = orderBookUiState.orderBook.buyOrders,
+                                sellOrders = orderBookUiState.orderBook.sellOrders,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 16.dp)
@@ -156,7 +161,10 @@ fun TokenDetailScreen(
                         .align(androidx.compose.ui.Alignment.BottomCenter)
                         .padding(bottom = 64.dp) // Position above bottom nav bar
                 ) {
-                    BuyButton(onClick = { showTradingBottomSheet = true })
+                    BuyButton(onClick = { 
+                        showTradingBottomSheet = true
+                        onBuyClick() // Also call the parent's onBuyClick for any additional logic
+                    })
                 }
             }
         }

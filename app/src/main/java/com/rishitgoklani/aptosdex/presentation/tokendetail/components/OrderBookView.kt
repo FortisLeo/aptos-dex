@@ -11,13 +11,134 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.rishitgoklani.aptosdex.domain.model.Order
 import com.rishitgoklani.aptosdex.presentation.tokendetail.OrderBookData
 
 /**
  * Order book view displaying bids (green/left) and asks (red/right)
+ * Updated to work with Order model from OrderBookRepository
  */
 @Composable
 fun OrderBookSection(
+    buyOrders: List<Order>,
+    sellOrders: List<Order>,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        // Header Row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Bids Header (Green - Left)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Bids",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.tertiary
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Price",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Amount",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Asks Header (Red - Right)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Asks",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.error
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Price",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Amount",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        HorizontalDivider(
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+            thickness = 1.dp
+        )
+
+        // Order Book Rows
+        val maxRows = maxOf(buyOrders.size, sellOrders.size)
+        val scrollState = rememberScrollState()
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(400.dp)
+                .verticalScroll(scrollState)
+        ) {
+            (0 until maxRows).forEach { index ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Bid Row (Green - Left)
+                    if (index < buyOrders.size) {
+                        val order = buyOrders[index]
+                        OrderBookRow(
+                            price = "$${String.format("%.2f", order.price)}",
+                            amount = String.format("%.4f", order.amount),
+                            isGreen = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+
+                    // Ask Row (Red - Right)
+                    if (index < sellOrders.size) {
+                        val order = sellOrders[index]
+                        OrderBookRow(
+                            price = "$${String.format("%.2f", order.price)}",
+                            amount = String.format("%.4f", order.amount),
+                            isGreen = false,
+                            modifier = Modifier.weight(1f)
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Legacy OrderBookSection for backward compatibility
+ */
+@Composable
+fun OrderBookSectionLegacy(
     orderBookData: OrderBookData,
     modifier: Modifier = Modifier
 ) {
