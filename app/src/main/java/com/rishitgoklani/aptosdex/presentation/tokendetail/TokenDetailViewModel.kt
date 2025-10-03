@@ -51,9 +51,16 @@ class TokenDetailViewModel @Inject constructor(
     private val _selectedTimePeriod = MutableStateFlow(TimePeriod.HOURS_24)
     val selectedTimePeriod: StateFlow<TimePeriod> = _selectedTimePeriod.asStateFlow()
 
+    private val _orderBookBids = MutableStateFlow<List<OrderBookLevel>>(emptyList())
+    val orderBookBids: StateFlow<List<OrderBookLevel>> = _orderBookBids.asStateFlow()
+
+    private val _orderBookAsks = MutableStateFlow<List<OrderBookLevel>>(emptyList())
+    val orderBookAsks: StateFlow<List<OrderBookLevel>> = _orderBookAsks.asStateFlow()
+
     private var currentSymbol: String = ""
     private var priceWebSocketJob: Job? = null
     private var orderBookWebSocketJob: Job? = null
+    private var lastOrderBookUpdateId: Long = 0L
 
     /**
      * Loads all token data including price, chart, and metadata
@@ -75,7 +82,31 @@ class TokenDetailViewModel @Inject constructor(
 
         fetchTokenPrice()
         fetchChartData()
+        loadOrderBookSnapshot()
         startWebSocketStreams()
+    }
+
+    /**
+     * Loads initial order book snapshot from REST API
+     */
+    private fun loadOrderBookSnapshot() {
+        if (currentSymbol.isEmpty()) return
+
+        viewModelScope.launch {
+            Log.d(TAG, "Loading order book snapshot for $currentSymbol")
+            when (val result = fetchOrderBookSnapshotUseCase(currentSymbol, limit = 20)) {
+                is OrderBookResult.Success -> {
+                    val snapshot = result.snapshot
+                    lastOrderBookUpdateId = snapshot.lastUpdateId
+                    _orderBookBids.value = snapshot.bids
+                    _orderBookAsks.value = snapshot.asks
+                    Log.d(TAG, "Order book snapshot loaded: ${snapshot.bids.size} bids, ${snapshot.asks.size} asks, lastUpdateId=$lastOrderBookUpdateId")
+                }
+                is OrderBookResult.Failure -> {
+                    Log.e(TAG, "Failed to load order book snapshot: ${result.error}")
+                }
+            }
+        }
     }
 
     /**
@@ -130,6 +161,7 @@ class TokenDetailViewModel @Inject constructor(
                 }
                 .collect { orderBookUpdate ->
                     Log.d(TAG, "OrderBook Update Received: ${orderBookUpdate.symbol}")
+                    Log.d(TAG, "Update IDs: first=${orderBookUpdate.firstUpdateId}, final=${orderBookUpdate.finalUpdateId}, last=$lastOrderBookUpdateId")
                     Log.d(TAG, "Bids: ${orderBookUpdate.bids.size}, Asks: ${orderBookUpdate.asks.size}")
                     if (orderBookUpdate.bids.isNotEmpty()) {
                         Log.d(TAG, "Best Bid: ${orderBookUpdate.bids.first().price}")
@@ -137,12 +169,78 @@ class TokenDetailViewModel @Inject constructor(
                     if (orderBookUpdate.asks.isNotEmpty()) {
                         Log.d(TAG, "Best Ask: ${orderBookUpdate.asks.first().price}")
                     }
-                    // Update order book UI state here
-                    // For now, this is just logged
+
+                    applyOrderBookUpdate(orderBookUpdate)
                 }
         }
 
         Log.d(TAG, "WebSocket streams started successfully for $currentSymbol")
+    }
+
+    /**
+     * Applies order book update from WebSocket
+     * Follows Binance's update ID validation rules
+     */
+    private fun applyOrderBookUpdate(update: com.rishitgoklani.aptosdex.domain.model.OrderBookUpdate) {
+        // Validate update based on Binance rules:
+        // 1. First event's firstUpdateId should be <= lastUpdateId+1
+        // 2. Each event's firstUpdateId should equal previous finalUpdateId+1
+
+        if (lastOrderBookUpdateId == 0L) {
+            // No snapshot loaded yet, skip this update
+            Log.w(TAG, "Skipping order book update: no snapshot loaded yet")
+            return
+        }
+
+        // For first update after snapshot: firstUpdateId <= lastUpdateId+1 AND finalUpdateId >= lastUpdateId+1
+        // For subsequent updates: firstUpdateId should equal previous finalUpdateId+1
+        if (update.firstUpdateId > lastOrderBookUpdateId + 1) {
+            Log.w(TAG, "Order book update gap detected. Expected firstUpdateId <= ${lastOrderBookUpdateId + 1}, got ${update.firstUpdateId}")
+            // Re-fetch snapshot to resync
+            loadOrderBookSnapshot()
+            return
+        }
+
+        if (update.finalUpdateId <= lastOrderBookUpdateId) {
+            Log.d(TAG, "Skipping old order book update: finalUpdateId=${update.finalUpdateId}, lastUpdateId=$lastOrderBookUpdateId")
+            return
+        }
+
+        // Apply updates to bids and asks
+        val updatedBids = mergePriceLevels(_orderBookBids.value, update.bids)
+            .sortedByDescending { it.price } // Highest bid first
+        val updatedAsks = mergePriceLevels(_orderBookAsks.value, update.asks)
+            .sortedBy { it.price } // Lowest ask first
+
+        _orderBookBids.value = updatedBids.take(20) // Keep top 20
+        _orderBookAsks.value = updatedAsks.take(20) // Keep top 20
+        lastOrderBookUpdateId = update.finalUpdateId
+
+        Log.d(TAG, "Applied order book update: finalUpdateId=$lastOrderBookUpdateId, bids=${updatedBids.size}, asks=${updatedAsks.size}")
+    }
+
+    /**
+     * Merges price level updates into existing order book
+     * Removes levels with quantity 0, updates existing levels, adds new levels
+     * Note: Sorting is done separately for bids (descending) and asks (ascending)
+     */
+    private fun mergePriceLevels(
+        existing: List<OrderBookLevel>,
+        updates: List<OrderBookLevel>
+    ): List<OrderBookLevel> {
+        val priceMap = existing.associateBy { it.price }.toMutableMap()
+
+        updates.forEach { update ->
+            if (update.quantity == 0.0) {
+                // Remove this price level
+                priceMap.remove(update.price)
+            } else {
+                // Update or add this price level
+                priceMap[update.price] = update
+            }
+        }
+
+        return priceMap.values.toList()
     }
 
     /**
@@ -343,25 +441,25 @@ class TokenDetailViewModel @Inject constructor(
     }
 
     /**
-     * Generates mock order book data for demo purposes
-     * @return OrderBookData with bids and asks
+     * Converts domain OrderBookLevel to UI OrderBookEntry
+     * Formats price and amount for display
      */
-    fun generateMockOrderBookData(): OrderBookData {
-        val bids = (0 until 15).map { i ->
-            val price = 12.34 - (i * 0.01)
+    fun getOrderBookData(): OrderBookData {
+        val bids = _orderBookBids.value.map { level ->
+            val total = level.price * level.quantity
             OrderBookEntry(
-                price = String.format("%.3f", price),
-                amount = String.format("%.2f", 100.0 + Math.random() * 500),
-                total = String.format("%.2f", (100.0 + Math.random() * 500) * price)
+                price = formatOrderBookPrice(level.price),
+                amount = formatOrderBookAmount(level.quantity),
+                total = formatOrderBookAmount(total)
             )
         }
 
-        val asks = (0 until 15).map { i ->
-            val price = 12.34 + (i * 0.01)
+        val asks = _orderBookAsks.value.map { level ->
+            val total = level.price * level.quantity
             OrderBookEntry(
-                price = String.format("%.3f", price),
-                amount = String.format("%.2f", 100.0 + Math.random() * 500),
-                total = String.format("%.2f", (100.0 + Math.random() * 500) * price)
+                price = formatOrderBookPrice(level.price),
+                amount = formatOrderBookAmount(level.quantity),
+                total = formatOrderBookAmount(total)
             )
         }
 
@@ -369,16 +467,25 @@ class TokenDetailViewModel @Inject constructor(
     }
 
     /**
-     * Gets base price for a given token symbol
-     * Used for mock data generation
+     * Formats price for order book display
      */
-    private fun getBasePriceForSymbol(symbol: String): Double {
-        return when (symbol.uppercase()) {
-            "APT" -> 12.34
-            "USDT", "USDC" -> 1.00
-            "WBTC" -> 66120.12
-            "CAKE" -> 4.56
-            else -> 10.0
+    private fun formatOrderBookPrice(price: Double): String {
+        return when {
+            price >= 1000 -> String.format(Locale.US, "%.2f", price)
+            price >= 1 -> String.format(Locale.US, "%.3f", price)
+            price >= 0.01 -> String.format(Locale.US, "%.4f", price)
+            else -> String.format(Locale.US, "%.6f", price)
+        }
+    }
+
+    /**
+     * Formats amount for order book display
+     */
+    private fun formatOrderBookAmount(amount: Double): String {
+        return when {
+            amount >= 1000 -> String.format(Locale.US, "%.2f", amount)
+            amount >= 1 -> String.format(Locale.US, "%.3f", amount)
+            else -> String.format(Locale.US, "%.4f", amount)
         }
     }
 }

@@ -42,7 +42,14 @@ fun TokenDetailScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val chartData by viewModel.chartData.collectAsStateWithLifecycle()
     val selectedTimePeriod by viewModel.selectedTimePeriod.collectAsStateWithLifecycle()
+    val orderBookBids by viewModel.orderBookBids.collectAsStateWithLifecycle()
+    val orderBookAsks by viewModel.orderBookAsks.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableStateOf(TabType.CHART) }
+
+    // Derive order book data from collected states
+    val orderBookData = remember(orderBookBids, orderBookAsks) {
+        viewModel.getOrderBookData()
+    }
 
     // Load chart data when screen opens
     LaunchedEffect(tokenSymbol) {
@@ -114,7 +121,6 @@ fun TokenDetailScreen(
                         // Order Book Section
                         item {
                             Spacer(Modifier.height(16.dp))
-                            val orderBookData = viewModel.generateMockOrderBookData()
                             OrderBookSection(
                                 orderBookData = orderBookData,
                                 modifier = Modifier

@@ -1,7 +1,9 @@
 package com.rishitgoklani.aptosdex.presentation.tokendetail.components
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -83,10 +85,13 @@ fun OrderBookSection(
 
         // Order Book Rows
         val maxRows = maxOf(orderBookData.bids.size, orderBookData.asks.size)
+        val scrollState = rememberScrollState()
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(400.dp)
+                .verticalScroll(scrollState)
         ) {
             (0 until maxRows).forEach { index ->
                 Row(

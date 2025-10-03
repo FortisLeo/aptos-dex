@@ -1,5 +1,6 @@
 package com.rishitgoklani.aptosdex.presentation.dex
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -30,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.rishitgoklani.aptosdex.ui.components.CosmicBackground
 
 @Composable
 fun DexScreen(
@@ -40,11 +42,18 @@ fun DexScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var query by remember { mutableStateOf(uiState.query) }
 
-    Column(
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp)
+            .background(MaterialTheme.colorScheme.background)
     ) {
+        CosmicBackground(modifier = Modifier.matchParentSize())
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp)
+        ) {
         // Search bar
         OutlinedTextField(
             value = query,
@@ -101,7 +110,8 @@ fun DexScreen(
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(bottom = 100.dp)
         ) {
             items(uiState.topTokens) { t ->
                 TopTokenRow(
@@ -113,6 +123,7 @@ fun DexScreen(
                     onClick = { onTokenClick(t.symbol, t.name, t.imageUrl, t.address) }
                 )
             }
+        }
         }
     }
 }
