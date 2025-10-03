@@ -17,6 +17,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.rishitgoklani.aptosdex.presentation.tokendetail.components.*
+import com.rishitgoklani.aptosdex.ui.components.CosmicBackground
 
 /**
  * Token Detail Screen
@@ -48,104 +49,108 @@ fun TokenDetailScreen(
         viewModel.loadTokenData(tokenSymbol, tokenAddress)
     }
 
-    Column(modifier = modifier.fillMaxSize()) {
-        TokenDetailTopBar(
-            tokenSymbol = tokenSymbol,
-            tokenName = tokenName,
-            tokenImageUrl = tokenImageUrl,
-            currentPrice = uiState.currentPrice,
-            priceChange = uiState.priceChange24h,
-            change24h = uiState.change24h
-        )
+    Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        CosmicBackground(modifier = Modifier.matchParentSize())
 
-        Box(modifier = Modifier.fillMaxSize()) {
-            // Background with gradient fade at bottom
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.surface,
-                                MaterialTheme.colorScheme.surface,
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
-                                Color.Transparent
-                            ),
-                            startY = 0f,
-                            endY = Float.POSITIVE_INFINITY
-                        )
-                    )
+        Column(modifier = Modifier.fillMaxSize()) {
+            TokenDetailTopBar(
+                tokenSymbol = tokenSymbol,
+                tokenName = tokenName,
+                tokenImageUrl = tokenImageUrl,
+                currentPrice = uiState.currentPrice,
+                priceChange = uiState.priceChange24h,
+                change24h = uiState.change24h
             )
 
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 140.dp) // Space for buy button + bottom nav
-            ) {
-            // Tabs: Chart / Order Book
-            item {
-                Spacer(Modifier.height(16.dp))
-                UnderlineTabRow(
-                    selectedTab = selectedTab,
-                    onTabSelected = { selectedTab = it }
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Background with gradient fade at bottom
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    MaterialTheme.colorScheme.surface,
+                                    MaterialTheme.colorScheme.surface,
+                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                                    Color.Transparent
+                                ),
+                                startY = 0f,
+                                endY = Float.POSITIVE_INFINITY
+                            )
+                        )
                 )
-            }
 
-            // Chart or Order Book Section
-            if (selectedTab == TabType.CHART) {
-                // Chart Section
-                item {
-                    Spacer(Modifier.height(16.dp))
-                    ChartSection(viewModel = viewModel)
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 140.dp) // Space for buy button + bottom nav
+                ) {
+                    // Tabs: Chart / Order Book
+                    item {
+                        Spacer(Modifier.height(16.dp))
+                        UnderlineTabRow(
+                            selectedTab = selectedTab,
+                            onTabSelected = { selectedTab = it }
+                        )
+                    }
+
+                    // Chart or Order Book Section
+                    if (selectedTab == TabType.CHART) {
+                        // Chart Section
+                        item {
+                            Spacer(Modifier.height(16.dp))
+                            ChartSection(viewModel = viewModel)
+                        }
+
+                        // Time Period Selector (below chart)
+                        item {
+                            Spacer(Modifier.height(16.dp))
+                            UnderlineTimePeriodSelector(
+                                selectedPeriod = selectedTimePeriod,
+                                onPeriodSelected = { viewModel.onTimePeriodChanged(it) }
+                            )
+                        }
+                    } else {
+                        // Order Book Section
+                        item {
+                            Spacer(Modifier.height(16.dp))
+                            val orderBookData = viewModel.generateMockOrderBookData()
+                            OrderBookSection(
+                                orderBookData = orderBookData,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp)
+                            )
+                        }
+                    }
+
+                    // Token Info Grid
+                    item {
+                        Spacer(Modifier.height(24.dp))
+                        Text(
+                            text = "Token Information",
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        TokenInfoGrid(uiState = uiState)
+                    }
+
+                    // Bottom spacing
+                    item {
+                        Spacer(Modifier.height(16.dp))
+                    }
                 }
 
-                // Time Period Selector (below chart)
-                item {
-                    Spacer(Modifier.height(16.dp))
-                    UnderlineTimePeriodSelector(
-                        selectedPeriod = selectedTimePeriod,
-                        onPeriodSelected = { viewModel.onTimePeriodChanged(it) }
-                    )
+                // Buy Button positioned above bottom nav
+                Box(
+                    modifier = Modifier
+                        .align(androidx.compose.ui.Alignment.BottomCenter)
+                        .padding(bottom = 64.dp) // Position above bottom nav bar
+                ) {
+                    BuyButton(onClick = onBuyClick)
                 }
-            } else {
-                // Order Book Section
-                item {
-                    Spacer(Modifier.height(16.dp))
-                    val orderBookData = viewModel.generateMockOrderBookData()
-                    OrderBookSection(
-                        orderBookData = orderBookData,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                    )
-                }
-            }
-
-            // Token Info Grid
-            item {
-                Spacer(Modifier.height(24.dp))
-                Text(
-                    text = "Token Information",
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(Modifier.height(12.dp))
-                TokenInfoGrid(uiState = uiState)
-            }
-
-            // Bottom spacing
-            item {
-                Spacer(Modifier.height(16.dp))
-            }
-        }
-
-            // Buy Button positioned above bottom nav
-            Box(
-                modifier = Modifier
-                    .align(androidx.compose.ui.Alignment.BottomCenter)
-                    .padding(bottom = 64.dp) // Position above bottom nav bar
-            ) {
-                BuyButton(onClick = onBuyClick)
             }
         }
     }
@@ -222,7 +227,7 @@ private fun PriceInfo(
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
             color = MaterialTheme.colorScheme.onSurface
         )
-        val changeColor = if (change24h >= 0) Color(0xFF2E7D32) else Color(0xFFC62828)
+        val changeColor = if (change24h >= 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
         val sign = if (change24h >= 0) "+" else ""
         Text(
             text = "$sign$priceChange (${sign}${String.format(java.util.Locale.US, "%.2f", change24h)}%)",

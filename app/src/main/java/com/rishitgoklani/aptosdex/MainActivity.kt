@@ -45,7 +45,7 @@ class MainActivity : FragmentActivity() {
         handleIntent(intent)
 
         setContent {
-            AptosDEXTheme {
+            AptosDEXTheme(darkTheme = true, dynamicColor = false) {
                 val walletUiState by walletViewModel.uiState.collectAsStateWithLifecycle()
 
                 // Navigation management
@@ -104,7 +104,11 @@ class MainActivity : FragmentActivity() {
                     }
                 }
 
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    containerColor = MaterialTheme.colorScheme.background,
+                    contentColor = MaterialTheme.colorScheme.onBackground
+                ) { innerPadding ->
                     when (currentScreen) {
                         AppScreen.WALLET_CONNECT -> {
                             WalletConnectScreen(

@@ -140,7 +140,7 @@ fun SwapCard(
                                     .size(24.dp)
                                     .clip(CircleShape)
                                     .background(
-                                        color = Color(0xFF00D4AA)
+                                        color = MaterialTheme.colorScheme.primary
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -149,7 +149,7 @@ fun SwapCard(
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontWeight = FontWeight.Bold
                                     ),
-                                    color = Color.White
+                                    color = MaterialTheme.colorScheme.onPrimary
                                 )
                             }
                         } else {

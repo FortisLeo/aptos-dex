@@ -2,6 +2,7 @@ package com.rishitgoklani.aptosdex.presentation.swap
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -16,6 +17,7 @@ import com.rishitgoklani.aptosdex.presentation.swap.components.SwapArrow
 import com.rishitgoklani.aptosdex.presentation.swap.components.SwapCard
 import com.rishitgoklani.aptosdex.presentation.tokens.SelectTokenScreen
 import com.rishitgoklani.aptosdex.presentation.tokens.TokenUi
+import com.rishitgoklani.aptosdex.ui.components.CosmicBackground
 
 /**
  * Swap screen following Clean Architecture and MVVM pattern
@@ -30,8 +32,11 @@ fun SwapScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Box(
-        modifier = modifier.fillMaxSize()
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
     ) {
+        CosmicBackground(modifier = Modifier.matchParentSize())
         Column(
             modifier = Modifier.fillMaxSize()
         ) {

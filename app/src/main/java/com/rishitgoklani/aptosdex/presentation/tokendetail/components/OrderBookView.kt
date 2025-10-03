@@ -32,7 +32,7 @@ fun OrderBookSection(
                 Text(
                     text = "Bids",
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                    color = Color(0xFF2E7D32)
+                    color = MaterialTheme.colorScheme.tertiary
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -56,7 +56,7 @@ fun OrderBookSection(
                 Text(
                     text = "Asks",
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                    color = Color(0xFFC62828)
+                    color = MaterialTheme.colorScheme.error
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -137,14 +137,14 @@ private fun OrderBookRow(
     modifier: Modifier = Modifier
 ) {
     val backgroundColor = if (isGreen) {
-        Color(0xFF2E7D32).copy(alpha = 0.08f)
+        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f)
     } else {
-        Color(0xFFC62828).copy(alpha = 0.08f)
+        MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
     }
     val textColor = if (isGreen) {
-        Color(0xFF2E7D32)
+        MaterialTheme.colorScheme.tertiary
     } else {
-        Color(0xFFC62828)
+        MaterialTheme.colorScheme.error
     }
 
     Surface(

@@ -129,7 +129,7 @@ private fun FavouriteTokenCard(
     val isUp = changePct >= 0
     Card(
         modifier = modifier
-            .border(1.dp, Color.LightGray, RoundedCornerShape(14.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(14.dp))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
@@ -161,7 +161,7 @@ private fun FavouriteTokenCard(
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val arrow = if (isUp) "▲" else "▼"
-                val color = if (isUp) Color(0xFF2E7D32) else Color(0xFFC62828)
+                val color = if (isUp) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
                 Text(
                     text = "$arrow ${String.format("%.2f", kotlin.math.abs(changePct))}%",
                     style = MaterialTheme.typography.labelMedium,
@@ -227,7 +227,7 @@ private fun TopTokenRow(
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
                 )
                 val arrow = if (isUp) "▲" else "▼"
-                val color = if (isUp) Color(0xFF2E7D32) else Color(0xFFC62828)
+                val color = if (isUp) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
                 Text(
                     text = "$arrow ${String.format("%.2f", kotlin.math.abs(changePct))}%",
                     style = MaterialTheme.typography.labelSmall,

@@ -1,6 +1,7 @@
 package com.rishitgoklani.aptosdex.presentation.home
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -28,11 +29,13 @@ import com.rishitgoklani.aptosdex.presentation.tokendetail.TokenDetailScreen
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.rishitgoklani.aptosdex.presentation.swap.SwapViewModel
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.border
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.haze
 import dev.chrisbanes.haze.hazeChild
 import dev.chrisbanes.haze.hazeEffect
+import com.rishitgoklani.aptosdex.ui.components.CosmicBackground
 
 
 enum class HomeTab(val title: String, val icon: ImageVector) {
@@ -65,7 +68,12 @@ fun HomeScreen(
     // Haze state for blur effect
     val hazeState = remember { HazeState() }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        CosmicBackground(modifier = Modifier.matchParentSize())
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -167,11 +175,16 @@ fun HomeScreen(
                 .align(Alignment.BottomCenter)
                 .padding(horizontal = 32.dp, vertical = 16.dp)
                 .clip(RoundedCornerShape(20.dp))
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
+                    shape = RoundedCornerShape(20.dp)
+                )
         ) {
             Surface(
                 modifier = Modifier
                     .hazeEffect(state = hazeState, style = HazeStyle.Unspecified),
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
                 tonalElevation = 8.dp,
                 shape = RoundedCornerShape(20.dp)
             ) {

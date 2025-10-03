@@ -8,6 +8,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
@@ -28,7 +30,7 @@ fun OrbitalAnimation(
     centerContent: @Composable () -> Unit,
     orbitingTokens: List<OrbitingToken>,
     modifier: Modifier = Modifier,
-    orbitColor: Color = Color.White.copy(alpha = 0.1f)
+    orbitColor: Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "orbital")
 
@@ -41,12 +43,25 @@ fun OrbitalAnimation(
             val center = Offset(size.width / 2, size.height / 2)
 
             orbitingTokens.forEach { token ->
+                // Two-part fade using sweep gradient: bright arcs with soft fades on opposite sides
+                val base = orbitColor
+                val transparent = base.copy(alpha = 0f)
+                val half = base.copy(alpha = base.alpha * 0.5f)
+
+                val brush = Brush.sweepGradient(
+                    colors = listOf(
+                        transparent, half, base, half, transparent, // first arc fade-in/out
+                        transparent, half, base, half, transparent   // second arc opposite side
+                    ),
+                    center = center
+                )
+
                 drawCircle(
-                    color = orbitColor,
+                    brush = brush,
                     radius = token.orbitRadius,
                     center = center,
                     style = Stroke(
-                        width = 2.dp.toPx(),
+                        width = 1.dp.toPx(),
                         cap = StrokeCap.Round
                     )
                 )

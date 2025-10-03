@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.rishitgoklani.aptosdex.ui.components.CosmicBackground
 
 @Composable
 fun BiometricPermissionScreen(
@@ -19,10 +20,16 @@ fun BiometricPermissionScreen(
     onEnableClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
     ) {
+        CosmicBackground(modifier = Modifier.matchParentSize())
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
         // Top Bar with Skip button
         Row(
             modifier = Modifier
@@ -100,6 +107,7 @@ fun BiometricPermissionScreen(
                 text = "Enable Biometrics",
                 style = MaterialTheme.typography.titleMedium
             )
+        }
         }
     }
 }
