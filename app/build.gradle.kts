@@ -95,6 +95,9 @@ dependencies {
     // Haze - Blur effect
     implementation("dev.chrisbanes.haze:haze:1.6.10")
 
+    // Aptos Kotlin SDK
+    implementation("xyz.mcxross.kaptos:kaptos-android:0.1.2-beta")
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

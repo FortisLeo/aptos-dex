@@ -45,6 +45,7 @@ fun TokenDetailScreen(
     val orderBookBids by viewModel.orderBookBids.collectAsStateWithLifecycle()
     val orderBookAsks by viewModel.orderBookAsks.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableStateOf(TabType.CHART) }
+    var showTradingBottomSheet by remember { mutableStateOf(false) }
 
     // Derive order book data from collected states
     val orderBookData = remember(orderBookBids, orderBookAsks) {
@@ -155,9 +156,23 @@ fun TokenDetailScreen(
                         .align(androidx.compose.ui.Alignment.BottomCenter)
                         .padding(bottom = 64.dp) // Position above bottom nav bar
                 ) {
-                    BuyButton(onClick = onBuyClick)
+                    BuyButton(onClick = { showTradingBottomSheet = true })
                 }
             }
+        }
+
+        // Trading Bottom Sheet
+        if (showTradingBottomSheet) {
+            TradingBottomSheet(
+                tokenSymbol = tokenSymbol,
+                currentPrice = uiState.currentPrice,
+                onDismiss = { showTradingBottomSheet = false },
+                onExecute = { tradeType, orderType, price, amount ->
+                    // Handle trade execution
+                    // TODO: Implement trade execution logic
+                    showTradingBottomSheet = false
+                }
+            )
         }
     }
 }
