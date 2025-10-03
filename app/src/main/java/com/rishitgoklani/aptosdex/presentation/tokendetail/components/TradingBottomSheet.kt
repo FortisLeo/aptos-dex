@@ -15,6 +15,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rishitgoklani.aptosdex.presentation.tokendetail.TradingBottomSheetViewModel
 
 enum class TradeType {
     BUY, SELL
@@ -34,38 +37,23 @@ fun TradingBottomSheet(
     tokenSymbol: String,
     currentPrice: String,
     onDismiss: () -> Unit,
-    onExecute: (tradeType: TradeType, orderType: OrderType, price: String, amount: String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    viewModel: TradingBottomSheetViewModel = hiltViewModel()
 ) {
-    var selectedTradeType by remember { mutableStateOf(TradeType.BUY) }
-    var selectedOrderType by remember { mutableStateOf(OrderType.MARKET) }
-    var priceInput by remember { mutableStateOf(currentPrice.replace("$", "")) }
-    var amountInput by remember { mutableStateOf("0") }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // For MARKET: price is fixed (current market price), amount is editable
-    // For LIMIT: both price and amount are editable
-    val effectivePrice = if (selectedOrderType == OrderType.MARKET) {
-        currentPrice.replace("$", "")
-    } else {
-        priceInput
-    }
-
-    val effectiveAmount = if (selectedOrderType == OrderType.LIMIT) {
-        val price = priceInput.toDoubleOrNull() ?: 0.0
-        if (price > 0) {
-            val defaultTradeValue = 1000.0
-            String.format("%.4f", defaultTradeValue / price)
-        } else {
-            ""
-        }
-    } else {
-        amountInput
+    // Initialize ViewModel with token data
+    LaunchedEffect(tokenSymbol, currentPrice) {
+        viewModel.initialize(tokenSymbol, currentPrice)
     }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {
+            viewModel.onDismiss()
+            onDismiss()
+        },
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
         modifier = modifier
@@ -78,7 +66,7 @@ fun TradingBottomSheet(
         ) {
             // Trading Pair Header
             Text(
-                text = "$tokenSymbol/USDC",
+                text = "${uiState.tokenSymbol}/USDC",
                 style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(bottom = 16.dp)
@@ -93,15 +81,15 @@ fun TradingBottomSheet(
             ) {
                 TradeTypeButton(
                     text = "Buy",
-                    isSelected = selectedTradeType == TradeType.BUY,
-                    onClick = { selectedTradeType = TradeType.BUY },
+                    isSelected = uiState.selectedTradeType == TradeType.BUY,
+                    onClick = { viewModel.onTradeTypeChanged(TradeType.BUY) },
                     isBuy = true,
                     modifier = Modifier.weight(1f)
                 )
                 TradeTypeButton(
                     text = "Sell",
-                    isSelected = selectedTradeType == TradeType.SELL,
-                    onClick = { selectedTradeType = TradeType.SELL },
+                    isSelected = uiState.selectedTradeType == TradeType.SELL,
+                    onClick = { viewModel.onTradeTypeChanged(TradeType.SELL) },
                     isBuy = false,
                     modifier = Modifier.weight(1f)
                 )
@@ -109,25 +97,21 @@ fun TradingBottomSheet(
 
             // Market/Limit Tabs
             TradingOrderTypeTabs(
-                selectedOrderType = selectedOrderType,
-                onOrderTypeSelected = { selectedOrderType = it },
+                selectedOrderType = uiState.selectedOrderType,
+                onOrderTypeSelected = { viewModel.onOrderTypeChanged(it) },
                 modifier = Modifier.padding(bottom = 20.dp)
             )
 
             // Price Input - Editable only in LIMIT mode
             OutlinedTextField(
-                value = effectivePrice,
-                onValueChange = {
-                    if (selectedOrderType == OrderType.LIMIT) {
-                        priceInput = it
-                    }
-                },
+                value = uiState.effectivePrice,
+                onValueChange = { viewModel.onPriceChanged(it) },
                 label = { Text("Price (USDC)") },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 12.dp),
                 singleLine = true,
-                enabled = selectedOrderType == OrderType.LIMIT,
+                enabled = uiState.selectedOrderType == OrderType.LIMIT,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -140,22 +124,12 @@ fun TradingBottomSheet(
             )
 
             // Amount Input with +/- controls (for MARKET) or auto-calculated (for LIMIT)
-            if (selectedOrderType == OrderType.MARKET) {
+            if (uiState.selectedOrderType == OrderType.MARKET) {
                 // MARKET mode: Amount is editable with +/- controls and numeric keyboard
                 OutlinedTextField(
-                    value = amountInput,
-                    onValueChange = {
-                        // Prevent negative values and invalid input
-                        if (it.isEmpty() || it == "-") {
-                            amountInput = "0"
-                        } else {
-                            val newValue = it.toDoubleOrNull()
-                            if (newValue != null && newValue >= 0) {
-                                amountInput = it
-                            }
-                        }
-                    },
-                    label = { Text("Amount ($tokenSymbol)") },
+                    value = uiState.amountInput,
+                    onValueChange = { viewModel.onAmountChanged(it) },
+                    label = { Text("Amount (${uiState.tokenSymbol})") },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 20.dp),
@@ -168,12 +142,7 @@ fun TradingBottomSheet(
                         ) {
                             // Minus button
                             IconButton(
-                                onClick = {
-                                    val current = amountInput.toDoubleOrNull() ?: 0.0
-                                    if (current > 0) {
-                                        amountInput = String.format("%.4f", (current - 0.1).coerceAtLeast(0.0))
-                                    }
-                                },
+                                onClick = { viewModel.decrementAmount() },
                                 modifier = Modifier.size(32.dp)
                             ) {
                                 Text(
@@ -184,10 +153,7 @@ fun TradingBottomSheet(
                             }
                             // Plus button
                             IconButton(
-                                onClick = {
-                                    val current = amountInput.toDoubleOrNull() ?: 0.0
-                                    amountInput = String.format("%.4f", current + 0.1)
-                                },
+                                onClick = { viewModel.incrementAmount() },
                                 modifier = Modifier.size(32.dp)
                             ) {
                                 Text(
@@ -207,9 +173,9 @@ fun TradingBottomSheet(
             } else {
                 // LIMIT mode: Amount is auto-calculated, non-editable
                 OutlinedTextField(
-                    value = effectiveAmount,
+                    value = uiState.effectiveAmount,
                     onValueChange = { },
-                    label = { Text("Amount ($tokenSymbol)") },
+                    label = { Text("Amount (${uiState.tokenSymbol})") },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 20.dp),
@@ -233,44 +199,62 @@ fun TradingBottomSheet(
             // Trading Info
             TradingInfoRow(
                 label = "Liquidation Price",
-                value = calculateLiquidationPrice(effectivePrice, selectedTradeType),
+                value = uiState.liquidationPrice,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
             TradingInfoRow(
                 label = "Order Value",
-                value = calculateOrderValue(effectivePrice, effectiveAmount),
+                value = uiState.orderValue,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
             TradingInfoRow(
                 label = "Margin Required",
-                value = calculateMarginRequired(effectivePrice, effectiveAmount),
+                value = uiState.marginRequired,
                 modifier = Modifier.padding(bottom = 24.dp)
             )
+
+            // Error message
+            uiState.errorMessage?.let { errorMessage ->
+                Text(
+                    text = errorMessage,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+            }
 
             // Execute Button
             Button(
                 onClick = {
-                    onExecute(selectedTradeType, selectedOrderType, effectivePrice, effectiveAmount)
+                    viewModel.executeOrder {
+                        onDismiss()
+                    }
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (selectedTradeType == TradeType.BUY) {
+                    containerColor = if (uiState.selectedTradeType == TradeType.BUY) {
                         MaterialTheme.colorScheme.tertiary
                     } else {
                         MaterialTheme.colorScheme.error
                     }
                 ),
-                enabled = effectivePrice.isNotBlank() && effectiveAmount.isNotBlank() &&
-                         effectiveAmount.toDoubleOrNull() ?: 0.0 > 0
+                enabled = uiState.canExecute
             ) {
-                Text(
-                    text = "Execute ${if (selectedTradeType == TradeType.BUY) "Buy" else "Sell"}",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = Color.White
-                )
+                if (uiState.isExecuting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = Color.White
+                    )
+                } else {
+                    Text(
+                        text = "Execute ${if (uiState.selectedTradeType == TradeType.BUY) "Buy" else "Sell"}",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = Color.White
+                    )
+                }
             }
         }
     }
@@ -399,38 +383,4 @@ private fun TradingInfoRow(
             color = MaterialTheme.colorScheme.onSurface
         )
     }
-}
-
-/**
- * Calculate liquidation price based on entry price and trade type
- */
-private fun calculateLiquidationPrice(price: String, tradeType: TradeType): String {
-    val priceValue = price.toDoubleOrNull() ?: return "--"
-    // Simple calculation: ±10% from entry price
-    val liquidationPrice = if (tradeType == TradeType.BUY) {
-        priceValue * 0.9
-    } else {
-        priceValue * 1.1
-    }
-    return "$${String.format("%.2f", liquidationPrice)}"
-}
-
-/**
- * Calculate order value (price * amount)
- */
-private fun calculateOrderValue(price: String, amount: String): String {
-    val priceValue = price.toDoubleOrNull() ?: return "--"
-    val amountValue = amount.toDoubleOrNull() ?: return "--"
-    val orderValue = priceValue * amountValue
-    return "$${String.format("%.2f", orderValue)}"
-}
-
-/**
- * Calculate margin required (20% of order value)
- */
-private fun calculateMarginRequired(price: String, amount: String): String {
-    val priceValue = price.toDoubleOrNull() ?: return "--"
-    val amountValue = amount.toDoubleOrNull() ?: return "--"
-    val marginRequired = (priceValue * amountValue) * 0.2
-    return "$${String.format("%.2f", marginRequired)}"
 }

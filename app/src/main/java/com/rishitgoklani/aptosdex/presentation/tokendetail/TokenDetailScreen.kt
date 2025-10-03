@@ -166,12 +166,7 @@ fun TokenDetailScreen(
             TradingBottomSheet(
                 tokenSymbol = tokenSymbol,
                 currentPrice = uiState.currentPrice,
-                onDismiss = { showTradingBottomSheet = false },
-                onExecute = { tradeType, orderType, price, amount ->
-                    // Handle trade execution
-                    // TODO: Implement trade execution logic
-                    showTradingBottomSheet = false
-                }
+                onDismiss = { showTradingBottomSheet = false }
             )
         }
     }
