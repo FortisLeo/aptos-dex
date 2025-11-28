@@ -13,3 +13,4 @@ class ConnectWalletUseCase @Inject constructor(
         return Pair(keys, publicKeyHex)
     }
 }
+
