@@ -13,3 +13,9 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Claude and Documentation
+.claude/
+CLAUDE.md
+README.md
+*.md
