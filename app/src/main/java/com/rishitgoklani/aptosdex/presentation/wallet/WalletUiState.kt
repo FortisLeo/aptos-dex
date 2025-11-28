@@ -7,3 +7,4 @@ data class WalletUiState(
     val isLoading: Boolean = false,
     val error: String? = null
 )
+
