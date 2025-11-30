@@ -18,31 +18,33 @@ object AptosConfig {
     const val DEFAULT_NETWORK_URL = TESTNET_URL
     const val DEFAULT_INDEXER_URL = TESTNET_INDEXER_URL
 
-    // Smart contract addresses
-    const val CLOB_CONTRACT_ADDRESS = "0xaa4efc5f6235612f916dbb2ba356876e740505113ac0062da07e64e41618422f"
-    const val CLOB_MODULE_NAME = "CLOB"
+    // DEX Smart Contract Address (from INTEGRATION_GUIDE.md)
+    const val DEX_CONTRACT_ADDRESS = "0xd4f4a886d54d280f06e3beebde86c7ff27a824dffb1a410dda625635cd16af5e"
 
-    // Deployment transaction info (Latest deployment)
-    const val DEPLOYMENT_TX_HASH = "0x3a0eed55613c002748f4c7e01265be627af4f707a1a575234733ff899a97eb4c"
-    const val DEPLOYMENT_VERSION = 6893375986L
-    const val DEPLOYMENT_SEQUENCE = 0L
+    // Module names
+    const val DEX_MODULE = "DEX"
+    const val ORDER_BOOK_MODULE = "OrderBook"
+    const val VAULT_MODULE = "Vault"
+    const val TOKEN_REGISTRY_MODULE = "TokenRegistry"
 
-    // View function names
-    const val VIEW_FUNCTION_GET_BOOK_DEPTH = "get_book_depth"
-    const val VIEW_FUNCTION_GET_BEST_BID = "get_best_bid"
-    const val VIEW_FUNCTION_GET_BEST_ASK = "get_best_ask"
-    const val VIEW_FUNCTION_GET_SPREAD = "get_spread"
+    // View function names for OrderBook
+    const val VIEW_GET_USER_BALANCES = "get_user_balances"
+    const val VIEW_GET_DEX_STATS = "get_dex_stats"
+    const val VIEW_GET_MARKET_PRICE = "get_market_price"
+    const val VIEW_GET_SPREAD = "get_spread"
 
-    // Entry function names for trading
-    const val ENTRY_FUNCTION_PLACE_BUY_ORDER = "place_buy_order"
-    const val ENTRY_FUNCTION_PLACE_SELL_ORDER = "place_sell_order"
+    // Entry function names
+    const val ENTRY_DEPOSIT = "deposit"
+    const val ENTRY_WITHDRAW = "withdraw"
+    const val ENTRY_PLACE_LIMIT_ORDER = "place_limit_order"
+    const val ENTRY_PLACE_MARKET_ORDER = "place_market_order"
+    const val ENTRY_CANCEL_ORDER = "cancel_order"
 
     // Event types
-    const val TRADE_EVENT_TYPE = "$CLOB_CONTRACT_ADDRESS::$CLOB_MODULE_NAME::TradeEvent"
-
-    // Order book address (where the OrderBook resource is stored)
-    // For deployed contracts, the OrderBook resource is typically stored at the contract address
-    const val ORDER_BOOK_ADDRESS = CLOB_CONTRACT_ADDRESS
+    const val TRADE_EVENT_TYPE = "$DEX_CONTRACT_ADDRESS::$DEX_MODULE::TradeEvent"
+    const val ORDER_EVENT_TYPE = "$DEX_CONTRACT_ADDRESS::$DEX_MODULE::OrderEvent"
+    const val DEPOSIT_EVENT_TYPE = "$DEX_CONTRACT_ADDRESS::$DEX_MODULE::DepositEvent"
+    const val WITHDRAWAL_EVENT_TYPE = "$DEX_CONTRACT_ADDRESS::$DEX_MODULE::WithdrawalEvent"
 
     // Configuration
     const val MAX_RETRIES = 3
@@ -51,16 +53,16 @@ object AptosConfig {
 
 /**
  * Coin type addresses for Aptos tokens (Testnet)
- * Using test coins deployed at the CLOB contract address
+ * Using standard Aptos coin types
  */
 object CoinTypes {
-    // Test coins deployed at CLOB contract address (format: address::module)
     // Aptos type tag format requires address::module::struct
     const val APT = "0x1::aptos_coin::AptosCoin"
-    const val USDC = "0xaa4efc5f6235612f916dbb2ba356876e740505113ac0062da07e64e41618422f::TestUSDC::TestUSDC"
-    const val BTC = "0xaa4efc5f6235612f916dbb2ba356876e740505113ac0062da07e64e41618422f::TestBTC::TestBTC"
-    const val ETH = "0xaa4efc5f6235612f916dbb2ba356876e740505113ac0062da07e64e41618422f::TestETH::TestETH"
-    const val USDT = "0xaa4efc5f6235612f916dbb2ba356876e740505113ac0062da07e64e41618422f::TestUSDT::TestUSDT"
+    // These would be the actual token types on testnet - update as needed
+    const val USDC = "0x1::test_coin::USDC"  // Placeholder - replace with actual testnet USDC
+    const val BTC = "0x1::test_coin::BTC"    // Placeholder
+    const val ETH = "0x1::test_coin::ETH"    // Placeholder
+    const val USDT = "0x1::test_coin::USDT"  // Placeholder
 }
 
 /**

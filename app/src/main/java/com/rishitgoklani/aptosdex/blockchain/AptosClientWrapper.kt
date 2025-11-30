@@ -49,12 +49,12 @@ class AptosClientWrapper @Inject constructor() {
     ): Result<List<Any>> = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "Calling view function: $functionName")
-            Log.d(TAG, "Contract: ${AptosConfig.CLOB_CONTRACT_ADDRESS}::${AptosConfig.CLOB_MODULE_NAME}")
+            Log.d(TAG, "Contract: ${AptosConfig.DEX_CONTRACT_ADDRESS}::${AptosConfig.DEX_MODULE}")
             Log.d(TAG, "Type arguments: $typeArguments")
             Log.d(TAG, "Arguments: $arguments")
 
-            // Build the function identifier
-            val functionId = "${AptosConfig.CLOB_CONTRACT_ADDRESS}::${AptosConfig.CLOB_MODULE_NAME}::$functionName"
+            // Build the function identifier using DEX contract
+            val functionId = "${AptosConfig.DEX_CONTRACT_ADDRESS}::${AptosConfig.DEX_MODULE}::$functionName"
 
             // Construct the payload
             val payload = mapOf(
@@ -312,19 +312,19 @@ class AptosClientWrapper @Inject constructor() {
             Log.d(TAG, "Market: $marketPair, Price: $price, Quantity: $quantity, IsBuy: $isBuy")
             Log.d(TAG, "Type arguments: $typeArguments")
 
-            val functionName = if (isBuy) {
-                AptosConfig.ENTRY_FUNCTION_PLACE_BUY_ORDER
-            } else {
-                AptosConfig.ENTRY_FUNCTION_PLACE_SELL_ORDER
-            }
+            // Use place_limit_order for both buy and sell (side is determined by parameter)
+            val functionName = AptosConfig.ENTRY_PLACE_LIMIT_ORDER
+            val functionId = "${AptosConfig.DEX_CONTRACT_ADDRESS}::${AptosConfig.DEX_MODULE}::$functionName"
 
-            val functionId = "${AptosConfig.CLOB_CONTRACT_ADDRESS}::${AptosConfig.CLOB_MODULE_NAME}::$functionName"
-
-            // Entry function arguments: (book_addr: address, price: u64, size: u64)
+            // Entry function arguments: (admin_addr: address, market_id: u64, side: bool, price: u64, size: u64)
+            // side: false = buy, true = sell
+            val marketId = 0 // Default market ID - should be determined by market pair
             val arguments = listOf(
-                AptosConfig.CLOB_CONTRACT_ADDRESS,
-                price.toLong().toString(),
-                quantity.toLong().toString()
+                AptosConfig.DEX_CONTRACT_ADDRESS,  // admin_addr
+                marketId.toString(),                // market_id
+                (!isBuy).toString(),               // side (false=buy, true=sell)
+                price.toLong().toString(),          // price
+                quantity.toLong().toString()        // size
             )
 
             // Return unsigned transaction payload for wallet to sign and submit

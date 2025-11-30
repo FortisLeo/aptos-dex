@@ -7,10 +7,7 @@ import com.rishitgoklani.aptosdex.domain.model.ChartDataResult
 import com.rishitgoklani.aptosdex.domain.model.ChartTimePeriod
 import com.rishitgoklani.aptosdex.domain.model.TokenPriceResult
 import com.rishitgoklani.aptosdex.domain.model.OrderBookLevel
-import com.rishitgoklani.aptosdex.domain.model.AptosOrderBookResult
 import com.rishitgoklani.aptosdex.domain.usecase.FetchChartDataUseCase
-import com.rishitgoklani.aptosdex.domain.usecase.FetchAptosOrderBookUseCase
-import com.rishitgoklani.aptosdex.domain.usecase.StreamAptosTradeEventsUseCase
 import com.rishitgoklani.aptosdex.domain.usecase.FetchTokenPricesUseCase
 import com.rishitgoklani.aptosdex.domain.usecase.SubscribeToPriceUpdatesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -33,8 +30,6 @@ import javax.inject.Inject
 class TokenDetailViewModel @Inject constructor(
     private val fetchChartDataUseCase: FetchChartDataUseCase,
     private val fetchTokenPricesUseCase: FetchTokenPricesUseCase,
-    private val fetchAptosOrderBookUseCase: FetchAptosOrderBookUseCase,
-    private val streamAptosTradeEventsUseCase: StreamAptosTradeEventsUseCase,
     private val subscribeToPriceUpdatesUseCase: SubscribeToPriceUpdatesUseCase
 ) : ViewModel() {
 
@@ -82,46 +77,39 @@ class TokenDetailViewModel @Inject constructor(
 
         fetchTokenPrice()
         fetchChartData()
-        loadOrderBookSnapshot()
+        // TODO: Re-integrate order book with new DEX repository
+        // loadOrderBookSnapshot()
         startWebSocketStreams()
     }
 
     /**
      * Loads initial order book snapshot from Aptos smart contract
      * Calls get_book_depth view function
+     * TODO: Re-integrate with new DexRepository
      */
     private fun loadOrderBookSnapshot() {
         if (currentSymbol.isEmpty()) return
 
+        // TODO: Integrate with new DexRepository.getSpread() and getMarketPrice()
+        Log.d(TAG, "Order book integration temporarily disabled - awaiting DexRepository integration")
+
+        /* Previous implementation - kept for reference
         viewModelScope.launch {
             Log.d(TAG, "Loading Aptos order book snapshot for $currentSymbol")
             when (val result = fetchAptosOrderBookUseCase(currentSymbol)) {
                 is AptosOrderBookResult.Success -> {
                     val snapshot = result.snapshot
-
-                    // Convert Aptos PriceLevels to OrderBookLevel format for UI
-                    // Aggregate all orders at each price level
                     val bids = snapshot.buyOrders.map { priceLevel ->
-                        OrderBookLevel(
-                            price = priceLevel.price,
-                            quantity = priceLevel.totalSize
-                        )
+                        OrderBookLevel(price = priceLevel.price, quantity = priceLevel.totalSize)
                     }
                     val asks = snapshot.sellOrders.map { priceLevel ->
-                        OrderBookLevel(
-                            price = priceLevel.price,
-                            quantity = priceLevel.totalSize
-                        )
+                        OrderBookLevel(price = priceLevel.price, quantity = priceLevel.totalSize)
                     }
-
                     _orderBookBids.value = bids
                     _orderBookAsks.value = asks
-
-                    // Initialize local order book for event updates
                     localOrderBook.clear()
                     bids.forEach { localOrderBook[it.price] = it }
                     asks.forEach { localOrderBook[it.price] = it }
-
                     Log.d(TAG, "Aptos order book snapshot loaded: ${snapshot.buyOrders.size} buy levels, ${snapshot.sellOrders.size} sell levels")
                 }
                 is AptosOrderBookResult.Failure -> {
@@ -129,6 +117,7 @@ class TokenDetailViewModel @Inject constructor(
                 }
             }
         }
+        */
     }
 
     /**
@@ -174,22 +163,24 @@ class TokenDetailViewModel @Inject constructor(
                 }
         }
 
+        // TODO: Re-integrate Aptos trade events with new DEX event streaming
         // Subscribe to Aptos trade events for order book updates
-        aptosTradeEventsJob = viewModelScope.launch {
-            Log.d(TAG, "Starting Aptos trade event stream for $currentSymbol")
-            streamAptosTradeEventsUseCase(currentSymbol)
-                .catch { e ->
-                    Log.e(TAG, "Error in Aptos trade event stream for $currentSymbol", e)
-                }
-                .collect { tradeEvent ->
-                    Log.d(TAG, "Aptos TradeEvent Received: seq=${tradeEvent.eventSequenceNumber}")
-                    Log.d(TAG, "MakerOrderId: ${tradeEvent.makerOrderId}, TakerOrderId: ${tradeEvent.takerOrderId}")
-                    Log.d(TAG, "Price: ${tradeEvent.price}, Size: ${tradeEvent.size}, Timestamp: ${tradeEvent.timestamp}")
-
-                    // Update local order book based on the trade
-                    applyTradeEventToOrderBook(tradeEvent)
-                }
-        }
+        // aptosTradeEventsJob = viewModelScope.launch {
+        //     Log.d(TAG, "Starting Aptos trade event stream for $currentSymbol")
+        //     streamAptosTradeEventsUseCase(currentSymbol)
+        //         .catch { e ->
+        //             Log.e(TAG, "Error in Aptos trade event stream for $currentSymbol", e)
+        //         }
+        //         .collect { tradeEvent ->
+        //             Log.d(TAG, "Aptos TradeEvent Received: seq=${tradeEvent.eventSequenceNumber}")
+        //             Log.d(TAG, "MakerOrderId: ${tradeEvent.makerOrderId}, TakerOrderId: ${tradeEvent.takerOrderId}")
+        //             Log.d(TAG, "Price: ${tradeEvent.price}, Size: ${tradeEvent.size}, Timestamp: ${tradeEvent.timestamp}")
+        //
+        //             // Update local order book based on the trade
+        //             applyTradeEventToOrderBook(tradeEvent)
+        //         }
+        // }
+        Log.d(TAG, "Aptos trade event streaming temporarily disabled")
 
         Log.d(TAG, "WebSocket streams started successfully for $currentSymbol")
     }

@@ -12,7 +12,7 @@ import javax.inject.Singleton
 
 /**
  * Service for streaming Aptos blockchain events
- * Provides real-time updates for TradeEvent emissions from the CLOB contract
+ * Provides real-time updates for TradeEvent emissions from the DEX contract
  */
 @Singleton
 class AptosEventStream @Inject constructor(
@@ -65,7 +65,7 @@ class AptosEventStream @Inject constructor(
             // subscription {
             //   events(
             //     where: {
-            //       account_address: {_eq: $CLOB_CONTRACT_ADDRESS},
+            //       account_address: {_eq: $DEX_CONTRACT_ADDRESS},
             //       type: {_eq: $TRADE_EVENT_TYPE},
             //       data: {_contains: {market_pair: $marketPair}}
             //     }
@@ -100,14 +100,14 @@ class AptosEventStream @Inject constructor(
 
             // Construct the OrderBook resource type with type arguments
             // Important: No spaces between comma and second type argument for Aptos API
-            val orderBookType = "${AptosConfig.CLOB_CONTRACT_ADDRESS}::${AptosConfig.CLOB_MODULE_NAME}::OrderBook<${typeArgs.first},${typeArgs.second}>"
+            val orderBookType = "${AptosConfig.DEX_CONTRACT_ADDRESS}::${AptosConfig.ORDER_BOOK_MODULE}::OrderBook<${typeArgs.first},${typeArgs.second}>"
 
             Log.d(TAG, "OrderBook resource type: $orderBookType")
 
             // Fetch events from the trade_events event handle
             // API: GET /accounts/{address}/events/{event_handle_struct}/{field_name}
             val eventsResult = aptosClient.getEventsByHandle(
-                address = AptosConfig.CLOB_CONTRACT_ADDRESS,
+                address = AptosConfig.DEX_CONTRACT_ADDRESS,
                 eventHandleStruct = orderBookType,
                 fieldName = "trade_events",
                 start = sinceSequence,
@@ -185,7 +185,7 @@ class AptosEventStream @Inject constructor(
         // subscription StreamTradeEvents($marketPair: String!) {
         //   events(
         //     where: {
-        //       account_address: {_eq: "${AptosConfig.CLOB_CONTRACT_ADDRESS}"},
+        //       account_address: {_eq: "${AptosConfig.DEX_CONTRACT_ADDRESS}"},
         //       type: {_eq: "${AptosConfig.TRADE_EVENT_TYPE}"},
         //       indexed_type: {_eq: "0x1::string::String"},
         //       data: {_cast: {String: {_contains: {market_pair: $marketPair}}}}

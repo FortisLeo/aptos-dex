@@ -3,13 +3,10 @@ package com.rishitgoklani.aptosdex.presentation.tokendetail
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.rishitgoklani.aptosdex.domain.model.Order
-import com.rishitgoklani.aptosdex.domain.model.OrderSide
-import com.rishitgoklani.aptosdex.domain.model.OrderType as DomainOrderType
-import com.rishitgoklani.aptosdex.domain.repository.OrderBookRepository
+import com.rishitgoklani.aptosdex.blockchain.AptosClientWrapper
+import com.rishitgoklani.aptosdex.blockchain.MarketPairs
+import com.rishitgoklani.aptosdex.blockchain.petra.PetraWalletConnector
 import com.rishitgoklani.aptosdex.domain.repository.WalletRepository
-import com.rishitgoklani.aptosdex.domain.usecase.PlaceOrderResult
-import com.rishitgoklani.aptosdex.domain.usecase.PlaceOrderUseCase
 import com.rishitgoklani.aptosdex.presentation.tokendetail.components.OrderType
 import com.rishitgoklani.aptosdex.presentation.tokendetail.components.TradeType
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -18,11 +15,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.util.Locale
-import javax.inject.Inject
-import com.rishitgoklani.aptosdex.blockchain.petra.PetraWalletConnector
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
+import java.util.Locale
+import javax.inject.Inject
 
 /**
  * UI state for trading bottom sheet
@@ -115,13 +111,12 @@ data class TradingBottomSheetUiState(
 
 /**
  * ViewModel for trading bottom sheet
- * Manages trading state, input validation, and order execution
+ * Manages trading state, input validation, and order execution via Petra Wallet
  */
 @HiltViewModel
 class TradingBottomSheetViewModel @Inject constructor(
-    private val placeOrderUseCase: PlaceOrderUseCase,
+    private val aptosClient: AptosClientWrapper,
     private val petraWalletConnector: PetraWalletConnector,
-    private val orderBookRepository: OrderBookRepository,
     private val walletRepository: WalletRepository
 ) : ViewModel() {
 
@@ -211,8 +206,8 @@ class TradingBottomSheetViewModel @Inject constructor(
     }
 
     /**
-     * Execute the trade order
-     * Places order in frontend orderbook (since smart contract is not working)
+     * Execute the trade order via Petra Wallet
+     * Builds transaction and opens Petra for signing
      */
     fun executeOrder(onSuccess: () -> Unit) {
         val state = _uiState.value
@@ -244,32 +239,53 @@ class TradingBottomSheetViewModel @Inject constructor(
                     return@launch
                 }
 
-                // Create order
-                val order = Order(
-                    symbol = state.tokenSymbol,
-                    side = if (isBuy) OrderSide.BUY else OrderSide.SELL,
-                    type = if (state.selectedOrderType == OrderType.LIMIT) DomainOrderType.LIMIT else DomainOrderType.MARKET,
+                // Get market pair and type arguments
+                val marketPair = MarketPairs.getMarketPair(state.tokenSymbol)
+                val typeArguments = MarketPairs.getTypeArguments(state.tokenSymbol)
+
+                // Build transaction for Petra wallet to sign
+                val txResult = aptosClient.buildPlaceOrderTransaction(
+                    senderAddress = walletAddress,
+                    marketPair = marketPair,
+                    typeArguments = listOf(typeArguments.first, typeArguments.second),
                     price = price,
-                    amount = amount,
-                    walletAddress = walletAddress
+                    quantity = amount,
+                    isBuy = isBuy
                 )
 
-                // Place order in frontend orderbook
-                val result = orderBookRepository.placeOrder(order)
-                if (result.isSuccess) {
-                    Log.d(TAG, "Order placed successfully: ${order.id}")
-                    _uiState.update { it.copy(isExecuting = false) }
-                    onSuccess()
-                } else {
-                    val errorMessage = result.exceptionOrNull()?.message ?: "Failed to place order"
-                    Log.e(TAG, "Order placement failed: $errorMessage")
-                    _uiState.update {
-                        it.copy(
-                            isExecuting = false,
-                            errorMessage = errorMessage
-                        )
+                txResult.fold(
+                    onSuccess = { payloadJson ->
+                        Log.d(TAG, "Transaction built successfully, opening Petra wallet")
+
+                        // Build Petra sign and submit intent
+                        try {
+                            val petraIntent = petraWalletConnector.buildSignAndSubmitIntent(payloadJson)
+
+                            // Emit navigation event to open Petra
+                            _navigationEvents.emit(NavigationEvent.OpenPetraWallet(petraIntent))
+
+                            _uiState.update { it.copy(isExecuting = false) }
+                            onSuccess()
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to build Petra intent", e)
+                            _uiState.update {
+                                it.copy(
+                                    isExecuting = false,
+                                    errorMessage = "Wallet not connected. Please connect Petra wallet first."
+                                )
+                            }
+                        }
+                    },
+                    onFailure = { error ->
+                        Log.e(TAG, "Failed to build transaction", error)
+                        _uiState.update {
+                            it.copy(
+                                isExecuting = false,
+                                errorMessage = error.message ?: "Failed to build transaction"
+                            )
+                        }
                     }
-                }
+                )
 
             } catch (e: Exception) {
                 Log.e(TAG, "Error executing order", e)

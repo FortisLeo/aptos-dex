@@ -201,12 +201,6 @@ abstract class RepositoryBindingsModule {
     abstract fun bindLivePriceRepository(
         impl: com.rishitgoklani.aptosdex.data.repository.LivePriceRepositoryImpl
     ): com.rishitgoklani.aptosdex.domain.repository.LivePriceRepository
-
-    @Binds
-    @Singleton
-    abstract fun bindOrderBookRepository(
-        impl: com.rishitgoklani.aptosdex.data.repository.OrderBookRepositoryImpl
-    ): com.rishitgoklani.aptosdex.domain.repository.OrderBookRepository
 }
 
 @Module
